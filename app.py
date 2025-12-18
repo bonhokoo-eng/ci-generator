@@ -323,27 +323,33 @@ if 'invoice_items' not in st.session_state:
 
 
 def check_password():
-    """비밀번호 인증 (30분 세션 타임아웃)"""
+    """비밀번호 인증 (쿠키 기반 30분 세션)"""
     import time
+    import extra_streamlit_components as stx
 
     SESSION_TIMEOUT = 30 * 60  # 30분 (초)
+    COOKIE_NAME = "ci_auth_token"
 
-    # 세션 초기화
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
-        st.session_state.auth_time = 0
+    # 쿠키 매니저 초기화
+    cookie_manager = stx.CookieManager(key="cookie_manager")
 
-    # 인증된 경우 타임아웃 체크
-    if st.session_state.authenticated:
-        current_time = time.time()
-        if current_time - st.session_state.auth_time < SESSION_TIMEOUT:
-            # 활동할 때마다 시간 갱신
-            st.session_state.auth_time = current_time
-            return True
-        else:
-            # 타임아웃 - 재로그인 필요
-            st.session_state.authenticated = False
-            st.session_state.auth_time = 0
+    # 쿠키에서 인증 토큰 확인
+    auth_cookie = cookie_manager.get(COOKIE_NAME)
+
+    if auth_cookie:
+        try:
+            # 토큰 형식: "timestamp"
+            auth_time = float(auth_cookie)
+            current_time = time.time()
+            if current_time - auth_time < SESSION_TIMEOUT:
+                # 유효한 세션 - 시간 갱신
+                cookie_manager.set(COOKIE_NAME, str(current_time), expires_at=None)
+                return True
+            else:
+                # 타임아웃 - 쿠키 삭제
+                cookie_manager.delete(COOKIE_NAME)
+        except (ValueError, TypeError):
+            cookie_manager.delete(COOKIE_NAME)
 
     st.title("🔐 CI Generator")
     st.caption("로그인이 필요합니다")
@@ -354,8 +360,8 @@ def check_password():
         # secrets에서 비밀번호 가져오기 (없으면 기본값 사용)
         correct_password = st.secrets.get("app_password", "b2b7788")
         if password == correct_password:
-            st.session_state.authenticated = True
-            st.session_state.auth_time = time.time()
+            # 쿠키에 인증 시간 저장
+            cookie_manager.set(COOKIE_NAME, str(time.time()), expires_at=None)
             st.rerun()
         else:
             st.error("잘못된 비밀번호입니다")
