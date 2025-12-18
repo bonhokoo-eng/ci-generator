@@ -529,6 +529,15 @@ def main():
     sku_master = get_sku_master()
     data_store = get_data_store()
 
+    # SKU Master 자동 로드 (Google Sheets 우선)
+    if not sku_master.is_loaded():
+        # Google Sheets 자동 연결 시도
+        try:
+            if sku_master.load_from_gsheet():
+                st.toast("SKU Master 로드 완료 (Google Sheets)")
+        except Exception:
+            pass  # 실패 시 무시 (수동 업로드 가능)
+
     # ========== SIDEBAR ==========
     with st.sidebar:
         st.header("Invoice Settings")
@@ -545,32 +554,35 @@ def main():
                 }
                 source_label = source_map.get(sku_master.get_source(), "로드됨")
                 st.success(f"현재: {source_label}")
+            else:
+                st.warning("SKU Master 미로드")
 
-            # Google Sheets 연결 버튼 (항상 표시)
-            if st.button("Google Sheets 연결", key="gsheet_connect"):
+            # Google Sheets 새로고침 버튼
+            if st.button("Google Sheets 새로고침", key="gsheet_refresh"):
                 with st.spinner("Google Sheets 연결 중..."):
                     if sku_master.load_from_gsheet():
-                        st.success("Google Sheets 연결 완료!")
+                        st.success("Google Sheets 새로고침 완료!")
                         st.rerun()
                     else:
                         st.error("연결 실패 - secrets 설정을 확인하세요")
 
-            # CSV 업로드 (항상 표시)
-            st.caption("CSV 업로드 (재업로드 가능):")
-            sku_file = st.file_uploader(
-                "SKU Master CSV",
-                type=['csv'],
-                key="sku_master_upload",
-                help="bs_sku_master CSV 파일 업로드"
-            )
+            # CSV 업로드 (백업용)
+            with st.popover("CSV 수동 업로드"):
+                st.caption("Google Sheets 연결 안될 때 사용")
+                sku_file = st.file_uploader(
+                    "SKU Master CSV",
+                    type=['csv'],
+                    key="sku_master_upload",
+                    help="bs_sku_master CSV 파일 업로드"
+                )
 
-            if sku_file:
-                try:
-                    sku_master.load_from_bytes(sku_file.getvalue())
-                    st.success("로드 완료!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"로드 실패: {e}")
+                if sku_file:
+                    try:
+                        sku_master.load_from_bytes(sku_file.getvalue())
+                        st.success("로드 완료!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"로드 실패: {e}")
 
         st.divider()
 
