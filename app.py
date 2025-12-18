@@ -24,7 +24,8 @@ from generator.po_parser import parse_po_file
 st.set_page_config(
     page_title="CI Generator",
     page_icon="📄",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # Custom CSS - Premium Modern Theme
@@ -783,14 +784,18 @@ def main():
 **Description:** {selected_product['description']}
 """)
 
-                            # 수량 및 가격 입력
-                            col_qty, col_price = st.columns(2)
-                            with col_qty:
+                            # 수량 및 가격 입력 (Row 1)
+                            row1_col1, row1_col2 = st.columns(2, vertical_alignment="bottom")
+                            with row1_col1:
                                 qty = st.number_input("수량 (EA) *", min_value=1, value=100, step=10)
-                                qty_outbox = st.number_input("QTY(OUTBOX)", min_value=0.0, value=0.0, step=1.0)
-
-                            with col_price:
+                            with row1_col2:
                                 is_foc = st.checkbox("F.O.C. (무상)")
+
+                            # 수량 및 가격 입력 (Row 2) - Outbox & Price
+                            row2_col1, row2_col2 = st.columns(2, vertical_alignment="bottom")
+                            with row2_col1:
+                                qty_outbox = st.number_input("QTY(OUTBOX)", min_value=0.0, value=0.0, step=1.0)
+                            with row2_col2:
                                 # F.O.C.도 가격 입력 가능 (기본값 0)
                                 unit_price = st.number_input(
                                     f"단가 ({currency})" + (" (기본 0)" if is_foc else " *"),
