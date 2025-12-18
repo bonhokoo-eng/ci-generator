@@ -874,12 +874,29 @@ def main():
             key="po_uploader"
         )
 
+        # 파싱 옵션 체크박스
+        st.caption("파싱 옵션")
+        col_opt1, col_opt2, col_opt3 = st.columns(3)
+        with col_opt1:
+            include_price = st.checkbox("단가 & Currency", value=True, key="po_opt_price")
+        with col_opt2:
+            include_hs_code = st.checkbox("HS CODE", value=False, key="po_opt_hs")
+        with col_opt3:
+            include_name_kr = st.checkbox("국문명", value=False, key="po_opt_kr")
+
         if uploaded_file:
             st.info(f"업로드된 파일: {uploaded_file.name}")
 
+            # 파싱 옵션 구성
+            parse_options = {
+                'include_price': include_price,
+                'include_hs_code': include_hs_code,
+                'include_name_kr': include_name_kr
+            }
+
             # 파싱 실행
             with st.spinner("PO 파일 파싱 중..."):
-                items, messages = parse_po_file(uploaded_file, uploaded_file.name)
+                items, messages = parse_po_file(uploaded_file, uploaded_file.name, parse_options)
 
             # 메시지 표시
             for msg in messages:
@@ -904,14 +921,28 @@ def main():
                     unit_price = item.get('unit_price', 0)
                     price_str = f"{unit_price:,.0f}" if unit_price else "-"
 
-                    preview_data.append({
+                    row_data = {
                         '': source_icon,
                         'SKU ID': item['sku_id'],
                         'Description': item['description'][:40] + '...' if len(item['description']) > 40 else item['description'],
-                        'QTY': item['qty'],
-                        f'단가({po_currency or currency})': price_str,
-                        'Barcode': item['barcode']
-                    })
+                    }
+
+                    # 선택 옵션에 따라 컬럼 추가
+                    if include_name_kr:
+                        name_kr = item.get('name_kr', '')
+                        row_data['국문명'] = name_kr[:20] + '...' if len(name_kr) > 20 else name_kr
+
+                    row_data['QTY'] = item['qty']
+
+                    if include_price:
+                        row_data[f'단가({po_currency or currency})'] = price_str
+
+                    if include_hs_code:
+                        row_data['HS CODE'] = item.get('hs_code', '')
+
+                    row_data['Barcode'] = item['barcode']
+
+                    preview_data.append(row_data)
 
                 st.dataframe(preview_data, use_container_width=True, hide_index=True)
                 st.caption("✅ = SKU Master 매칭, ⚠️ = PO에서만 (Master에 없음)")
@@ -940,7 +971,8 @@ def main():
                             sku_id=item['sku_id'],
                             barcode=item['barcode'],
                             description=item['description'],
-                            hs_code=item.get('hs_code', ''),
+                            description_kr=item.get('name_kr', '') if include_name_kr else '',
+                            hs_code=item.get('hs_code', '') if include_hs_code else '',
                             qty=item['qty'],
                             qty_outbox=0.0,
                             unit_price=0.0 if all_foc else item_price,

@@ -31,12 +31,22 @@ class POParser:
         '수량'
     ]
 
-    # 제품명 컬럼 후보
-    NAME_COLUMN_CANDIDATES = [
+    # 영문 상품명 컬럼 후보 (우선)
+    NAME_EN_COLUMN_CANDIDATES = [
         'Product Name_EN',
+        'PRODUCT NAME_EN',
+        'ENGLISH NAME',
+        'DESCRIPTION_EN',
         'PRODUCT NAME',
-        'DESCRIPTION',
+        'DESCRIPTION'
+    ]
+
+    # 국문 상품명 컬럼 후보
+    NAME_KR_COLUMN_CANDIDATES = [
+        'Product Name_KR',
+        'PRODUCT NAME_KR',
         '상품명',
+        'KOREAN NAME',
         'ITEM NAME'
     ]
 
@@ -77,6 +87,15 @@ class POParser:
         'CURRENCY',
         '통화',
         'CURR'
+    ]
+
+    # HS CODE 컬럼 후보
+    HS_CODE_COLUMN_CANDIDATES = [
+        'HS CODE',
+        'HS_CODE',
+        'HSCODE',
+        'HS CODE(TARIFF)',
+        'TARIFF CODE'
     ]
 
     def __init__(self):
@@ -142,17 +161,27 @@ class POParser:
 
         return None
 
-    def parse(self, file, filename: str = "") -> Tuple[List[Dict], List[str]]:
+    def parse(self, file, filename: str = "", options: dict = None) -> Tuple[List[Dict], List[str]]:
         """
         PO Excel 파일 파싱
 
         Args:
             file: 업로드된 파일 객체 (BytesIO 또는 파일 경로)
             filename: 파일명 (확장자 확인용)
+            options: 파싱 옵션
+                - include_price: 단가/통화 포함 (기본 True)
+                - include_hs_code: HS CODE 포함 (기본 False)
+                - include_name_kr: 국문명 별도 포함 (기본 False)
 
         Returns:
             (파싱된 아이템 리스트, 에러/경고 메시지 리스트)
         """
+        # 기본 옵션
+        if options is None:
+            options = {}
+        include_price = options.get('include_price', True)
+        include_hs_code = options.get('include_hs_code', False)
+        include_name_kr = options.get('include_name_kr', False)
         items = []
         messages = []
 
@@ -196,10 +225,12 @@ class POParser:
             # 4. 컬럼 찾기
             sku_col = self.find_column(df.columns.tolist(), self.SKU_COLUMN_CANDIDATES)
             qty_col = self.find_column(df.columns.tolist(), self.QTY_COLUMN_CANDIDATES)
-            name_col = self.find_column(df.columns.tolist(), self.NAME_COLUMN_CANDIDATES)
+            name_en_col = self.find_column(df.columns.tolist(), self.NAME_EN_COLUMN_CANDIDATES)
+            name_kr_col = self.find_column(df.columns.tolist(), self.NAME_KR_COLUMN_CANDIDATES)
             barcode_col = self.find_column(df.columns.tolist(), self.BARCODE_COLUMN_CANDIDATES)
             price_col = self.find_column(df.columns.tolist(), self.PRICE_COLUMN_CANDIDATES)
             amount_col = self.find_column(df.columns.tolist(), self.AMOUNT_COLUMN_CANDIDATES)
+            hs_code_col = self.find_column(df.columns.tolist(), self.HS_CODE_COLUMN_CANDIDATES) if include_hs_code else None
 
             if not sku_col:
                 messages.append("⚠️ SKU ID 컬럼을 찾을 수 없습니다")
@@ -223,14 +254,20 @@ class POParser:
 
             messages.append(f"SKU column: {sku_col}")
             messages.append(f"QTY column: {qty_col}")
-            if price_col:
+            if name_en_col:
+                messages.append(f"Name (EN) column: {name_en_col}")
+            if name_kr_col:
+                messages.append(f"Name (KR) column: {name_kr_col}")
+            if price_col and include_price:
                 messages.append(f"Price column: {price_col}")
-            if amount_col:
+            if amount_col and include_price:
                 messages.append(f"Amount column: {amount_col}")
             if currency_col:
                 messages.append(f"Currency column: {currency_col}")
             elif detected_currency:
                 messages.append(f"Detected currency: {detected_currency}")
+            if hs_code_col:
+                messages.append(f"HS CODE column: {hs_code_col}")
 
             # 5. 데이터 추출
             not_found_skus = []
@@ -250,11 +287,26 @@ class POParser:
                 if qty <= 0:
                     continue
 
-                # PO에서 직접 가져온 정보
-                po_name = str(row.get(name_col, '')) if name_col else ''
+                # PO에서 직접 가져온 정보 (영문 우선, 없으면 국문)
+                po_name_en = str(row.get(name_en_col, '')) if name_en_col else ''
+                po_name_kr = str(row.get(name_kr_col, '')) if name_kr_col else ''
+                if po_name_en == 'nan':
+                    po_name_en = ''
+                if po_name_kr == 'nan':
+                    po_name_kr = ''
+                # Description: 영문 우선, 없으면 국문
+                po_description = po_name_en if po_name_en else po_name_kr
+
                 po_barcode = str(row.get(barcode_col, '')) if barcode_col else ''
                 if po_barcode == 'nan':
                     po_barcode = ''
+
+                # HS CODE 파싱
+                po_hs_code = ''
+                if hs_code_col:
+                    hs_value = str(row.get(hs_code_col, ''))
+                    if hs_value and hs_value != 'nan':
+                        po_hs_code = hs_value
 
                 # 단가 파싱
                 unit_price = 0.0
@@ -287,32 +339,37 @@ class POParser:
                 sku_info = self.sku_master.get_by_sku_id(sku_id)
 
                 if sku_info:
+                    # SKU Master description 우선, 없으면 PO description
+                    description = sku_info.get('description', '') or po_description
                     items.append({
                         'sku_id': sku_id,
                         'barcode': sku_info.get('barcode', po_barcode),
-                        'description': sku_info.get('description', po_name),
+                        'description': description,
+                        'name_kr': po_name_kr if include_name_kr else '',
                         'qty': qty,
-                        'unit_price': unit_price,
-                        'amount': amount,
-                        'currency': currency,
-                        'hs_code': sku_info.get('hs_code', ''),
-                        'source': 'master',  # SKU Master에서 매칭됨
+                        'unit_price': unit_price if include_price else 0.0,
+                        'amount': amount if include_price else 0.0,
+                        'currency': currency if include_price else None,
+                        'hs_code': po_hs_code or sku_info.get('hs_code', ''),
+                        'source': 'master',
                         'manufacturer': sku_info.get('manufacturer', ''),
                         'variant_status': sku_info.get('variant_status', '')
                     })
                 else:
                     # SKU Master에 없는 경우
                     not_found_skus.append(sku_id)
+                    description = po_description if po_description else f'[미등록] {sku_id}'
                     items.append({
                         'sku_id': sku_id,
                         'barcode': po_barcode,
-                        'description': po_name if po_name and po_name != 'nan' else f'[미등록] {sku_id}',
+                        'description': description,
+                        'name_kr': po_name_kr if include_name_kr else '',
                         'qty': qty,
-                        'unit_price': unit_price,
-                        'amount': amount,
-                        'currency': currency,
-                        'hs_code': '',
-                        'source': 'po_only',  # PO에서만 가져옴
+                        'unit_price': unit_price if include_price else 0.0,
+                        'amount': amount if include_price else 0.0,
+                        'currency': currency if include_price else None,
+                        'hs_code': po_hs_code,
+                        'source': 'po_only',
                         'manufacturer': '',
                         'variant_status': ''
                     })
@@ -383,19 +440,20 @@ class POParser:
         return all_items, all_messages
 
 
-def parse_po_file(file, filename: str = "") -> Tuple[List[Dict], List[str]]:
+def parse_po_file(file, filename: str = "", options: dict = None) -> Tuple[List[Dict], List[str]]:
     """
     PO 파일 파싱 헬퍼 함수
 
     Args:
         file: 업로드된 파일 객체
         filename: 파일명
+        options: 파싱 옵션 (include_price, include_hs_code, include_name_kr)
 
     Returns:
         (파싱된 아이템 리스트, 메시지 리스트)
     """
     parser = POParser()
-    return parser.parse(file, filename)
+    return parser.parse(file, filename, options)
 
 
 if __name__ == "__main__":

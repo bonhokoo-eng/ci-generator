@@ -76,6 +76,7 @@ class LineItem:
     sku_id: str
     barcode: str = ""
     description: str = ""
+    description_kr: str = ""  # 국문명 (선택)
     hs_code: str = ""
     qty: int = 0
     qty_outbox: float = 0.0  # QTY(OUTBOX)
@@ -309,9 +310,21 @@ class CIGenerator:
             row += 2
 
         # === ITEM TABLE ===
-        item_headers = ['SKU ID', 'BARCODE', 'DESCRIPTION OF GOODS', 'HS CODE',
-                       'QTY\n(EA)', 'QTY\n(OUTBOX)', 'UNIT PRICE', 'TOTAL']
-        item_cols = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
+        # 국문명 포함 여부 확인
+        has_kr = any(item.description_kr for item in data.items)
+
+        if has_kr:
+            # 국문명 컬럼 추가 (DESCRIPTION OF GOODS 다음)
+            item_headers = ['SKU ID', 'BARCODE', 'DESCRIPTION OF GOODS', '품명(국문)',
+                           'HS CODE', 'QTY\n(EA)', 'QTY\n(OUTBOX)', 'UNIT PRICE', 'TOTAL']
+            item_cols = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
+            # 컬럼 너비 조정 (J 컬럼 추가)
+            ws.column_dimensions['J'].width = 12
+        else:
+            # 기존 구조 유지
+            item_headers = ['SKU ID', 'BARCODE', 'DESCRIPTION OF GOODS', 'HS CODE',
+                           'QTY\n(EA)', 'QTY\n(OUTBOX)', 'UNIT PRICE', 'TOTAL']
+            item_cols = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
 
         # 헤더 행
         for col, header in zip(item_cols, item_headers):
@@ -331,6 +344,14 @@ class CIGenerator:
         total_outbox = 0.0
         has_foc = False
 
+        # 컬럼 인덱스 설정 (국문명 포함 여부에 따라 다름)
+        if has_kr:
+            col_idx = {'sku': 'B', 'barcode': 'C', 'desc': 'D', 'desc_kr': 'E',
+                      'hs': 'F', 'qty': 'G', 'outbox': 'H', 'price': 'I', 'total': 'J'}
+        else:
+            col_idx = {'sku': 'B', 'barcode': 'C', 'desc': 'D', 'desc_kr': None,
+                      'hs': 'E', 'qty': 'F', 'outbox': 'G', 'price': 'H', 'total': 'I'}
+
         for item in data.items:
             line_total = 0 if item.is_foc else item.qty * item.unit_price
             subtotal += line_total
@@ -340,84 +361,97 @@ class CIGenerator:
                 has_foc = True
 
             # SKU ID
-            ws[f'B{row}'] = item.sku_id
-            ws[f'B{row}'].font = self.VALUE_FONT
-            ws[f'B{row}'].border = self.THIN_BORDER
+            ws[f'{col_idx["sku"]}{row}'] = item.sku_id
+            ws[f'{col_idx["sku"]}{row}'].font = self.VALUE_FONT
+            ws[f'{col_idx["sku"]}{row}'].border = self.THIN_BORDER
 
             # BARCODE
-            ws[f'C{row}'] = item.barcode
-            ws[f'C{row}'].font = self.VALUE_FONT
-            ws[f'C{row}'].border = self.THIN_BORDER
+            ws[f'{col_idx["barcode"]}{row}'] = item.barcode
+            ws[f'{col_idx["barcode"]}{row}'].font = self.VALUE_FONT
+            ws[f'{col_idx["barcode"]}{row}'].border = self.THIN_BORDER
 
             # DESCRIPTION
             desc = item.description
             if item.is_foc and "- FOC" not in desc:
                 desc = f"{desc} - FOC"
-            ws[f'D{row}'] = desc
-            ws[f'D{row}'].font = self.VALUE_FONT
-            ws[f'D{row}'].border = self.THIN_BORDER
-            ws[f'D{row}'].alignment = Alignment(wrap_text=True)
+            ws[f'{col_idx["desc"]}{row}'] = desc
+            ws[f'{col_idx["desc"]}{row}'].font = self.VALUE_FONT
+            ws[f'{col_idx["desc"]}{row}'].border = self.THIN_BORDER
+            ws[f'{col_idx["desc"]}{row}'].alignment = Alignment(wrap_text=True)
+
+            # DESCRIPTION KR (국문명) - 조건부
+            if has_kr:
+                ws[f'{col_idx["desc_kr"]}{row}'] = item.description_kr or ''
+                ws[f'{col_idx["desc_kr"]}{row}'].font = self.VALUE_FONT
+                ws[f'{col_idx["desc_kr"]}{row}'].border = self.THIN_BORDER
+                ws[f'{col_idx["desc_kr"]}{row}'].alignment = Alignment(wrap_text=True)
 
             # HS CODE
-            ws[f'E{row}'] = item.hs_code
-            ws[f'E{row}'].font = self.VALUE_FONT
-            ws[f'E{row}'].border = self.THIN_BORDER
+            ws[f'{col_idx["hs"]}{row}'] = item.hs_code
+            ws[f'{col_idx["hs"]}{row}'].font = self.VALUE_FONT
+            ws[f'{col_idx["hs"]}{row}'].border = self.THIN_BORDER
 
             # QTY(EA)
-            ws[f'F{row}'] = f"{item.qty:,}"
-            ws[f'F{row}'].font = self.VALUE_FONT
-            ws[f'F{row}'].border = self.THIN_BORDER
-            ws[f'F{row}'].alignment = Alignment(horizontal='right')
+            ws[f'{col_idx["qty"]}{row}'] = f"{item.qty:,}"
+            ws[f'{col_idx["qty"]}{row}'].font = self.VALUE_FONT
+            ws[f'{col_idx["qty"]}{row}'].border = self.THIN_BORDER
+            ws[f'{col_idx["qty"]}{row}'].alignment = Alignment(horizontal='right')
 
             # QTY(OUTBOX)
-            ws[f'G{row}'] = f"{item.qty_outbox:.1f}" if item.qty_outbox else ""
-            ws[f'G{row}'].font = self.VALUE_FONT
-            ws[f'G{row}'].border = self.THIN_BORDER
-            ws[f'G{row}'].alignment = Alignment(horizontal='right')
+            ws[f'{col_idx["outbox"]}{row}'] = f"{item.qty_outbox:.1f}" if item.qty_outbox else ""
+            ws[f'{col_idx["outbox"]}{row}'].font = self.VALUE_FONT
+            ws[f'{col_idx["outbox"]}{row}'].border = self.THIN_BORDER
+            ws[f'{col_idx["outbox"]}{row}'].alignment = Alignment(horizontal='right')
 
             # UNIT PRICE
             if item.is_foc:
-                ws[f'H{row}'] = f"{data.currency} {int(item.unit_price):,}" if item.unit_price else f"{data.currency} 0"
+                ws[f'{col_idx["price"]}{row}'] = f"{data.currency} {int(item.unit_price):,}" if item.unit_price else f"{data.currency} 0"
             else:
-                ws[f'H{row}'] = f"{data.currency} {int(item.unit_price):,}" if data.currency != 'USD' else f"USD {item.unit_price:,.2f}"
-            ws[f'H{row}'].font = self.VALUE_FONT
-            ws[f'H{row}'].border = self.THIN_BORDER
-            ws[f'H{row}'].alignment = Alignment(horizontal='right')
+                ws[f'{col_idx["price"]}{row}'] = f"{data.currency} {int(item.unit_price):,}" if data.currency != 'USD' else f"USD {item.unit_price:,.2f}"
+            ws[f'{col_idx["price"]}{row}'].font = self.VALUE_FONT
+            ws[f'{col_idx["price"]}{row}'].border = self.THIN_BORDER
+            ws[f'{col_idx["price"]}{row}'].alignment = Alignment(horizontal='right')
 
             # TOTAL
-            ws[f'I{row}'] = f"{data.currency} {int(line_total):,}" if data.currency != 'USD' else f"USD {line_total:,.2f}"
-            ws[f'I{row}'].font = self.VALUE_FONT
-            ws[f'I{row}'].border = self.THIN_BORDER
-            ws[f'I{row}'].alignment = Alignment(horizontal='right')
+            ws[f'{col_idx["total"]}{row}'] = f"{data.currency} {int(line_total):,}" if data.currency != 'USD' else f"USD {line_total:,.2f}"
+            ws[f'{col_idx["total"]}{row}'].font = self.VALUE_FONT
+            ws[f'{col_idx["total"]}{row}'].border = self.THIN_BORDER
+            ws[f'{col_idx["total"]}{row}'].alignment = Alignment(horizontal='right')
 
             row += 1
 
         # TOTAL 행
-        ws[f'B{row}'] = "TOTAL"
-        ws[f'B{row}'].font = self.LABEL_FONT
-        ws[f'B{row}'].border = self.THIN_BORDER
+        ws[f'{col_idx["sku"]}{row}'] = "TOTAL"
+        ws[f'{col_idx["sku"]}{row}'].font = self.LABEL_FONT
+        ws[f'{col_idx["sku"]}{row}'].border = self.THIN_BORDER
 
-        for col in ['C', 'D', 'E']:
-            ws[f'{col}{row}'].border = self.THIN_BORDER
+        # 빈 셀들 테두리
+        empty_cols = ['barcode', 'desc']
+        if has_kr:
+            empty_cols.append('desc_kr')
+        empty_cols.append('hs')
+        for col_key in empty_cols:
+            if col_idx.get(col_key):
+                ws[f'{col_idx[col_key]}{row}'].border = self.THIN_BORDER
 
-        ws[f'F{row}'] = f"{total_qty:,}"
-        ws[f'F{row}'].font = self.LABEL_FONT
-        ws[f'F{row}'].border = self.THIN_BORDER
-        ws[f'F{row}'].alignment = Alignment(horizontal='right')
+        ws[f'{col_idx["qty"]}{row}'] = f"{total_qty:,}"
+        ws[f'{col_idx["qty"]}{row}'].font = self.LABEL_FONT
+        ws[f'{col_idx["qty"]}{row}'].border = self.THIN_BORDER
+        ws[f'{col_idx["qty"]}{row}'].alignment = Alignment(horizontal='right')
 
-        ws[f'G{row}'] = f"{total_outbox:.1f}"
-        ws[f'G{row}'].font = self.LABEL_FONT
-        ws[f'G{row}'].border = self.THIN_BORDER
-        ws[f'G{row}'].alignment = Alignment(horizontal='right')
+        ws[f'{col_idx["outbox"]}{row}'] = f"{total_outbox:.1f}"
+        ws[f'{col_idx["outbox"]}{row}'].font = self.LABEL_FONT
+        ws[f'{col_idx["outbox"]}{row}'].border = self.THIN_BORDER
+        ws[f'{col_idx["outbox"]}{row}'].alignment = Alignment(horizontal='right')
 
-        ws[f'H{row}'].border = self.THIN_BORDER
+        ws[f'{col_idx["price"]}{row}'].border = self.THIN_BORDER
 
         # TOTAL 금액 (노란 배경)
-        ws[f'I{row}'] = f"₩{int(subtotal):,}" if data.currency == 'KRW' else f"${subtotal:,.2f}"
-        ws[f'I{row}'].font = self.LABEL_FONT
-        ws[f'I{row}'].border = self.THIN_BORDER
-        ws[f'I{row}'].fill = self.YELLOW_FILL
-        ws[f'I{row}'].alignment = Alignment(horizontal='right')
+        ws[f'{col_idx["total"]}{row}'] = f"₩{int(subtotal):,}" if data.currency == 'KRW' else f"${subtotal:,.2f}"
+        ws[f'{col_idx["total"]}{row}'].font = self.LABEL_FONT
+        ws[f'{col_idx["total"]}{row}'].border = self.THIN_BORDER
+        ws[f'{col_idx["total"]}{row}'].fill = self.YELLOW_FILL
+        ws[f'{col_idx["total"]}{row}'].alignment = Alignment(horizontal='right')
 
         row += 2
         remarks_start_row = row
@@ -474,67 +508,69 @@ class CIGenerator:
         ws[f'B{row}'].font = self.LABEL_FONT
 
         # === SUMMARY (우측) ===
+        # 국문명 컬럼 포함 시 한 컬럼씩 이동
+        sum_cols = ('H', 'I', 'J') if has_kr else ('G', 'H', 'I')
         summary_row = remarks_start_row
 
         # SUBTOTAL
-        ws[f'G{summary_row}'] = "SUBTOTAL"
-        ws[f'G{summary_row}'].font = self.LABEL_FONT
-        ws[f'G{summary_row}'].border = self.THIN_BORDER
-        ws[f'H{summary_row}'] = data.currency
-        ws[f'H{summary_row}'].font = self.VALUE_FONT
-        ws[f'H{summary_row}'].border = self.THIN_BORDER
-        ws[f'I{summary_row}'] = f"{int(subtotal):,}" if data.currency != 'USD' else f"{subtotal:,.2f}"
-        ws[f'I{summary_row}'].font = self.VALUE_FONT
-        ws[f'I{summary_row}'].border = self.THIN_BORDER
-        ws[f'I{summary_row}'].alignment = Alignment(horizontal='right')
+        ws[f'{sum_cols[0]}{summary_row}'] = "SUBTOTAL"
+        ws[f'{sum_cols[0]}{summary_row}'].font = self.LABEL_FONT
+        ws[f'{sum_cols[0]}{summary_row}'].border = self.THIN_BORDER
+        ws[f'{sum_cols[1]}{summary_row}'] = data.currency
+        ws[f'{sum_cols[1]}{summary_row}'].font = self.VALUE_FONT
+        ws[f'{sum_cols[1]}{summary_row}'].border = self.THIN_BORDER
+        ws[f'{sum_cols[2]}{summary_row}'] = f"{int(subtotal):,}" if data.currency != 'USD' else f"{subtotal:,.2f}"
+        ws[f'{sum_cols[2]}{summary_row}'].font = self.VALUE_FONT
+        ws[f'{sum_cols[2]}{summary_row}'].border = self.THIN_BORDER
+        ws[f'{sum_cols[2]}{summary_row}'].alignment = Alignment(horizontal='right')
         summary_row += 1
 
         # TAX
         tax_amount = subtotal * data.tax_rate
-        ws[f'G{summary_row}'] = "TAX"
-        ws[f'G{summary_row}'].font = self.LABEL_FONT
-        ws[f'G{summary_row}'].border = self.THIN_BORDER
-        ws[f'H{summary_row}'] = data.currency
-        ws[f'H{summary_row}'].font = self.VALUE_FONT
-        ws[f'H{summary_row}'].border = self.THIN_BORDER
-        ws[f'I{summary_row}'] = f"{int(tax_amount):,}" if data.currency != 'USD' else f"{tax_amount:,.2f}"
-        ws[f'I{summary_row}'].font = self.VALUE_FONT
-        ws[f'I{summary_row}'].border = self.THIN_BORDER
-        ws[f'I{summary_row}'].alignment = Alignment(horizontal='right')
+        ws[f'{sum_cols[0]}{summary_row}'] = "TAX"
+        ws[f'{sum_cols[0]}{summary_row}'].font = self.LABEL_FONT
+        ws[f'{sum_cols[0]}{summary_row}'].border = self.THIN_BORDER
+        ws[f'{sum_cols[1]}{summary_row}'] = data.currency
+        ws[f'{sum_cols[1]}{summary_row}'].font = self.VALUE_FONT
+        ws[f'{sum_cols[1]}{summary_row}'].border = self.THIN_BORDER
+        ws[f'{sum_cols[2]}{summary_row}'] = f"{int(tax_amount):,}" if data.currency != 'USD' else f"{tax_amount:,.2f}"
+        ws[f'{sum_cols[2]}{summary_row}'].font = self.VALUE_FONT
+        ws[f'{sum_cols[2]}{summary_row}'].border = self.THIN_BORDER
+        ws[f'{sum_cols[2]}{summary_row}'].alignment = Alignment(horizontal='right')
         summary_row += 1
 
         # TOTAL (Declaration)
         total_declaration = subtotal + tax_amount
-        ws[f'G{summary_row}'] = "TOTAL (Declaration)"
-        ws[f'G{summary_row}'].font = self.LABEL_FONT
-        ws[f'G{summary_row}'].border = self.THIN_BORDER
-        ws[f'G{summary_row}'].fill = self.YELLOW_FILL
-        ws[f'H{summary_row}'] = data.currency
-        ws[f'H{summary_row}'].font = self.VALUE_FONT
-        ws[f'H{summary_row}'].border = self.THIN_BORDER
-        ws[f'H{summary_row}'].fill = self.YELLOW_FILL
-        ws[f'I{summary_row}'] = f"{int(total_declaration):,}" if data.currency != 'USD' else f"{total_declaration:,.2f}"
-        ws[f'I{summary_row}'].font = self.LABEL_FONT
-        ws[f'I{summary_row}'].border = self.THIN_BORDER
-        ws[f'I{summary_row}'].fill = self.YELLOW_FILL
-        ws[f'I{summary_row}'].alignment = Alignment(horizontal='right')
+        ws[f'{sum_cols[0]}{summary_row}'] = "TOTAL (Declaration)"
+        ws[f'{sum_cols[0]}{summary_row}'].font = self.LABEL_FONT
+        ws[f'{sum_cols[0]}{summary_row}'].border = self.THIN_BORDER
+        ws[f'{sum_cols[0]}{summary_row}'].fill = self.YELLOW_FILL
+        ws[f'{sum_cols[1]}{summary_row}'] = data.currency
+        ws[f'{sum_cols[1]}{summary_row}'].font = self.VALUE_FONT
+        ws[f'{sum_cols[1]}{summary_row}'].border = self.THIN_BORDER
+        ws[f'{sum_cols[1]}{summary_row}'].fill = self.YELLOW_FILL
+        ws[f'{sum_cols[2]}{summary_row}'] = f"{int(total_declaration):,}" if data.currency != 'USD' else f"{total_declaration:,.2f}"
+        ws[f'{sum_cols[2]}{summary_row}'].font = self.LABEL_FONT
+        ws[f'{sum_cols[2]}{summary_row}'].border = self.THIN_BORDER
+        ws[f'{sum_cols[2]}{summary_row}'].fill = self.YELLOW_FILL
+        ws[f'{sum_cols[2]}{summary_row}'].alignment = Alignment(horizontal='right')
         summary_row += 1
 
         # TOTAL (Transaction) - FOC인 경우
         if has_foc:
-            ws[f'G{summary_row}'] = "TOTAL (Transaction)"
-            ws[f'G{summary_row}'].font = self.LABEL_FONT
-            ws[f'G{summary_row}'].border = self.THIN_BORDER
-            ws[f'G{summary_row}'].fill = self.YELLOW_FILL
-            ws[f'H{summary_row}'] = data.currency
-            ws[f'H{summary_row}'].font = self.VALUE_FONT
-            ws[f'H{summary_row}'].border = self.THIN_BORDER
-            ws[f'H{summary_row}'].fill = self.YELLOW_FILL
-            ws[f'I{summary_row}'] = f"{int(data.total_transaction):,}" if data.currency != 'USD' else f"{data.total_transaction:,.2f}"
-            ws[f'I{summary_row}'].font = self.LABEL_FONT
-            ws[f'I{summary_row}'].border = self.THIN_BORDER
-            ws[f'I{summary_row}'].fill = self.YELLOW_FILL
-            ws[f'I{summary_row}'].alignment = Alignment(horizontal='right')
+            ws[f'{sum_cols[0]}{summary_row}'] = "TOTAL (Transaction)"
+            ws[f'{sum_cols[0]}{summary_row}'].font = self.LABEL_FONT
+            ws[f'{sum_cols[0]}{summary_row}'].border = self.THIN_BORDER
+            ws[f'{sum_cols[0]}{summary_row}'].fill = self.YELLOW_FILL
+            ws[f'{sum_cols[1]}{summary_row}'] = data.currency
+            ws[f'{sum_cols[1]}{summary_row}'].font = self.VALUE_FONT
+            ws[f'{sum_cols[1]}{summary_row}'].border = self.THIN_BORDER
+            ws[f'{sum_cols[1]}{summary_row}'].fill = self.YELLOW_FILL
+            ws[f'{sum_cols[2]}{summary_row}'] = f"{int(data.total_transaction):,}" if data.currency != 'USD' else f"{data.total_transaction:,.2f}"
+            ws[f'{sum_cols[2]}{summary_row}'].font = self.LABEL_FONT
+            ws[f'{sum_cols[2]}{summary_row}'].border = self.THIN_BORDER
+            ws[f'{sum_cols[2]}{summary_row}'].fill = self.YELLOW_FILL
+            ws[f'{sum_cols[2]}{summary_row}'].alignment = Alignment(horizontal='right')
 
         return wb
 
