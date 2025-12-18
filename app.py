@@ -331,6 +331,31 @@ if 'invoice_items' not in st.session_state:
     st.session_state.invoice_items = []
 
 
+def check_password():
+    """비밀번호 인증"""
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if st.session_state.authenticated:
+        return True
+
+    st.title("🔐 CI Generator")
+    st.caption("로그인이 필요합니다")
+
+    password = st.text_input("Password", type="password", key="password_input")
+
+    if st.button("Login", type="primary"):
+        # secrets에서 비밀번호 가져오기 (없으면 기본값 사용)
+        correct_password = st.secrets.get("app_password", "b2b7788")
+        if password == correct_password:
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("잘못된 비밀번호입니다")
+
+    return False
+
+
 def render_invoice_items(currency, staff_email, receiver_info, data_store, invoice_date,
                          customer_code, order_no, staff_phone, is_domestic, shipping,
                          tax_rate, total_transaction, custom_remarks, key_prefix="main"):
@@ -478,6 +503,10 @@ def render_invoice_items(currency, staff_email, receiver_info, data_store, invoi
 
 
 def main():
+    # 인증 체크
+    if not check_password():
+        return
+
     st.title("📄 Commercial Invoice Generator")
 
     # Data stores
