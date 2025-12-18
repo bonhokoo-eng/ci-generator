@@ -13,7 +13,7 @@ import io
 
 # Google Sheets 설정
 GSHEET_URL = "https://docs.google.com/spreadsheets/d/1tQsyTHMhJXfV5xDzNsV2BgTZB7Pjm4OIhYxzG2267PI/edit"
-GSHEET_WORKSHEET = "sku_master"  # 시트 이름 (gid=1951994186)
+GSHEET_WORKSHEET = 1951994186  # gid 번호로 지정
 
 
 class SKUMaster:
