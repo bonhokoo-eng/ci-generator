@@ -894,14 +894,22 @@ def main():
                 # 파싱 결과 미리보기
                 st.subheader(f"파싱 결과: {len(items)}개 상품")
 
+                # 통화 확인 (첫 번째 아이템에서)
+                po_currency = items[0].get('currency', '') if items else ''
+
                 preview_data = []
                 for item in items:
                     source_icon = "✅" if item['source'] == 'master' else "⚠️"
+                    # 단가 포맷팅
+                    unit_price = item.get('unit_price', 0)
+                    price_str = f"{unit_price:,.0f}" if unit_price else "-"
+
                     preview_data.append({
                         '': source_icon,
                         'SKU ID': item['sku_id'],
                         'Description': item['description'][:40] + '...' if len(item['description']) > 40 else item['description'],
                         'QTY': item['qty'],
+                        f'단가({po_currency or currency})': price_str,
                         'Barcode': item['barcode']
                     })
 
@@ -926,6 +934,8 @@ def main():
                 if st.button("➕ 전체 상품 추가", type="primary", key="po_add_all"):
                     added_count = 0
                     for item in items:
+                        # PO에서 파싱된 단가가 있으면 사용, 없으면 기본 단가 사용
+                        item_price = item.get('unit_price', 0.0) or default_price
                         line_item = LineItem(
                             sku_id=item['sku_id'],
                             barcode=item['barcode'],
@@ -933,7 +943,7 @@ def main():
                             hs_code=item.get('hs_code', ''),
                             qty=item['qty'],
                             qty_outbox=0.0,
-                            unit_price=0.0 if all_foc else default_price,
+                            unit_price=0.0 if all_foc else item_price,
                             is_foc=all_foc
                         )
                         st.session_state.invoice_items.append(line_item)
