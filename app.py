@@ -108,8 +108,16 @@ h3 { font-size: 1.25rem !important; }
     border-radius: var(--radius-md) !important;
     color: var(--text-primary) !important;
     font-size: 0.9rem !important;
+    height: 42px !important; /* Fixed height for alignment */
+    min-height: 42px !important;
     transition: all 0.2s ease;
     box-shadow: var(--shadow-sm);
+    display: flex !important;
+    align-items: center !important;
+}
+
+.stTextInput > div, .stNumberInput > div, .stSelectbox > div {
+    min-height: 42px !important;
 }
 
 .stTextInput input:focus, .stNumberInput input:focus, .stSelectbox [data-baseweb="select"] > div:focus-within {
@@ -122,8 +130,14 @@ h3 { font-size: 1.25rem !important; }
 .stButton > button {
     border-radius: var(--radius-md) !important;
     font-weight: 500 !important;
-    padding: 0.5rem 1.25rem !important;
+    padding: 0 1.25rem !important;
+    height: 42px !important; /* Match input height */
+    min-height: 42px !important;
+    line-height: 42px !important;
     transition: all 0.2s ease;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 /* Primary Button */
@@ -153,14 +167,43 @@ h3 { font-size: 1.25rem !important; }
 }
 
 /* Delete/Action Icon Buttons - Ghost Style */
-[data-testid="stHorizontalBlock"] .stButton > button {
+/* Targeting buttons that are likely icon-only or "X" buttons */
+[data-testid="stHorizontalBlock"] .stButton > button,
+button:has(div p:contains("X")), /* Try to target buttons containing text "X" */
+div[data-testid="column"] button {
+   /* We use general button styling but override for icon-like buttons if needed */
+}
+
+/* Specific override for the "X" buttons in the columns (Item list) & Sidebar Delete */
+/* Using a more generic selector for the small action buttons */
+[data-testid="column"] .stButton > button {
+    min-width: 42px !important;
+    width: 42px !important;
+    padding: 0 !important;
+    color: var(--text-tertiary) !important;
+    background: transparent !important;
+    border: 1px solid var(--border-light) !important;
+}
+
+[data-testid="column"] .stButton > button:hover {
+    background-color: var(--error-bg) !important;
+    color: var(--error-text) !important;
+    border-color: var(--error-bg) !important;
+}
+
+/* Sidebar Header Alignment Fix */
+[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
+    align-items: flex-end !important; /* Ensure bottom alignment */
+}
+
+[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] .stButton > button {
+    margin-bottom: 2px !important; /* Micro-adjustment for visual alignment with inputs */
     background: transparent !important;
     border: 1px solid transparent !important;
     color: var(--text-tertiary) !important;
-    box-shadow: none !important;
 }
 
-[data-testid="stHorizontalBlock"] .stButton > button:hover:not(:disabled) {
+[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] .stButton > button:hover:not(:disabled) {
     background-color: var(--error-bg) !important;
     color: var(--error-text) !important;
 }
