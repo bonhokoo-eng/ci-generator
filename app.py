@@ -874,8 +874,13 @@ def main():
             key="po_uploader"
         )
 
-        # 파싱 옵션 체크박스
-        st.caption("파싱 옵션")
+        # 추가 선택 테이블 (하이라이트)
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+                    padding: 1rem; border-radius: 0.5rem; margin: 0.5rem 0;">
+            <p style="margin: 0 0 0.5rem 0; font-weight: 600; color: #4338ca;">📋 추가 선택 테이블</p>
+        </div>
+        """, unsafe_allow_html=True)
         col_opt1, col_opt2, col_opt3 = st.columns(3)
         with col_opt1:
             include_price = st.checkbox("단가 & Currency", value=True, key="po_opt_price")
@@ -898,14 +903,15 @@ def main():
             with st.spinner("PO 파일 파싱 중..."):
                 items, messages = parse_po_file(uploaded_file, uploaded_file.name, parse_options)
 
-            # 메시지 표시
-            for msg in messages:
-                if msg.startswith("❌"):
-                    st.error(msg)
-                elif msg.startswith("⚠️"):
-                    st.warning(msg)
-                else:
-                    st.caption(msg)
+            # 메시지 표시 (기본 접힘 상태)
+            with st.expander("🔍 파싱 상세 정보", expanded=False):
+                for msg in messages:
+                    if msg.startswith("❌"):
+                        st.error(msg)
+                    elif msg.startswith("⚠️"):
+                        st.warning(msg)
+                    else:
+                        st.caption(msg)
 
             if items:
                 # 파싱 결과 미리보기
