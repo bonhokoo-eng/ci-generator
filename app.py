@@ -332,12 +332,27 @@ if 'invoice_items' not in st.session_state:
 
 
 def check_password():
-    """비밀번호 인증"""
+    """비밀번호 인증 (30분 세션 타임아웃)"""
+    import time
+
+    SESSION_TIMEOUT = 30 * 60  # 30분 (초)
+
+    # 세션 초기화
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
+        st.session_state.auth_time = 0
 
+    # 인증된 경우 타임아웃 체크
     if st.session_state.authenticated:
-        return True
+        current_time = time.time()
+        if current_time - st.session_state.auth_time < SESSION_TIMEOUT:
+            # 활동할 때마다 시간 갱신
+            st.session_state.auth_time = current_time
+            return True
+        else:
+            # 타임아웃 - 재로그인 필요
+            st.session_state.authenticated = False
+            st.session_state.auth_time = 0
 
     st.title("🔐 CI Generator")
     st.caption("로그인이 필요합니다")
@@ -349,6 +364,7 @@ def check_password():
         correct_password = st.secrets.get("app_password", "b2b7788")
         if password == correct_password:
             st.session_state.authenticated = True
+            st.session_state.auth_time = time.time()
             st.rerun()
         else:
             st.error("잘못된 비밀번호입니다")
