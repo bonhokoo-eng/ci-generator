@@ -560,11 +560,14 @@ def main():
             # Google Sheets 새로고침 버튼
             if st.button("Google Sheets 새로고침", key="gsheet_refresh"):
                 with st.spinner("Google Sheets 연결 중..."):
-                    if sku_master.load_from_gsheet():
-                        st.success("Google Sheets 새로고침 완료!")
-                        st.rerun()
-                    else:
-                        st.error("연결 실패 - secrets 설정을 확인하세요")
+                    try:
+                        if sku_master.load_from_gsheet():
+                            st.success("Google Sheets 새로고침 완료!")
+                            st.rerun()
+                        else:
+                            st.error("연결 실패 - secrets 설정을 확인하세요")
+                    except Exception as e:
+                        st.error(f"연결 에러: {e}")
 
             # CSV 업로드 (백업용)
             with st.popover("CSV 수동 업로드"):
