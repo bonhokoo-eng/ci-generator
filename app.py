@@ -319,10 +319,10 @@ footer {
     color: var(--muted-foreground) !important;
 }
 
-/* Hide Streamlit branding */
+/* Hide Streamlit branding - but keep sidebar toggle */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-header {visibility: hidden;}
+/* header 숨기면 sidebar toggle도 사라지므로 제거 */
 </style>
 """, unsafe_allow_html=True)
 
@@ -519,6 +519,7 @@ def main():
 
         # ===== SKU Master 설정 =====
         with st.expander("SKU Master 설정", expanded=not sku_master.is_loaded()):
+            # 현재 상태 표시
             if sku_master.is_loaded():
                 source_map = {
                     "local": "로컬 CSV",
@@ -527,32 +528,33 @@ def main():
                     "dataframe": "DataFrame"
                 }
                 source_label = source_map.get(sku_master.get_source(), "로드됨")
-                st.success(f"SKU Master: {source_label}")
-            else:
-                # Google Sheets 자동 연결 시도
-                if st.button("Google Sheets 연결", key="gsheet_connect"):
-                    with st.spinner("Google Sheets 연결 중..."):
-                        if sku_master.load_from_gsheet():
-                            st.success("Google Sheets 연결 완료!")
-                            st.rerun()
-                        else:
-                            st.error("연결 실패 - secrets 설정을 확인하세요")
+                st.success(f"현재: {source_label}")
 
-                st.caption("또는 CSV 직접 업로드:")
-                sku_file = st.file_uploader(
-                    "SKU Master CSV",
-                    type=['csv'],
-                    key="sku_master_upload",
-                    help="bs_sku_master CSV 파일 업로드"
-                )
-
-                if sku_file:
-                    try:
-                        sku_master.load_from_bytes(sku_file.getvalue())
-                        st.success("로드 완료!")
+            # Google Sheets 연결 버튼 (항상 표시)
+            if st.button("Google Sheets 연결", key="gsheet_connect"):
+                with st.spinner("Google Sheets 연결 중..."):
+                    if sku_master.load_from_gsheet():
+                        st.success("Google Sheets 연결 완료!")
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"로드 실패: {e}")
+                    else:
+                        st.error("연결 실패 - secrets 설정을 확인하세요")
+
+            # CSV 업로드 (항상 표시)
+            st.caption("CSV 업로드 (재업로드 가능):")
+            sku_file = st.file_uploader(
+                "SKU Master CSV",
+                type=['csv'],
+                key="sku_master_upload",
+                help="bs_sku_master CSV 파일 업로드"
+            )
+
+            if sku_file:
+                try:
+                    sku_master.load_from_bytes(sku_file.getvalue())
+                    st.success("로드 완료!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"로드 실패: {e}")
 
         st.divider()
 
