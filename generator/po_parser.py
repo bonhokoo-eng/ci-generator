@@ -66,12 +66,39 @@ class POParser:
         'TOTAL AMOUNT',
         'AMOUNT(KRW)',
         'AMOUNT (KRW)',
+        'AMOUNT(USD)',
+        'AMOUNT (USD)',
         '금액',
         'TOTAL'
     ]
 
+    # 통화 컬럼 후보
+    CURRENCY_COLUMN_CANDIDATES = [
+        'CURRENCY',
+        '통화',
+        'CURR'
+    ]
+
     def __init__(self):
         self.sku_master = get_sku_master()
+
+    def detect_currency_from_column(self, col_name: str) -> Optional[str]:
+        """
+        컬럼명에서 통화 감지
+        예: 'AMOUNT(KRW)' -> 'KRW', 'Supply Price (USD)' -> 'USD'
+        """
+        if not col_name:
+            return None
+        col_upper = str(col_name).upper()
+        if 'KRW' in col_upper or '원' in col_name:
+            return 'KRW'
+        if 'USD' in col_upper or '$' in col_name:
+            return 'USD'
+        if 'EUR' in col_upper or '€' in col_name:
+            return 'EUR'
+        if 'JPY' in col_upper or '¥' in col_name:
+            return 'JPY'
+        return None
 
     def find_header_row(self, df: pd.DataFrame) -> int:
         """
@@ -182,12 +209,28 @@ class POParser:
                 messages.append("⚠️ 수량(QTY) 컬럼을 찾을 수 없습니다")
                 return items, messages
 
+            # 통화 컬럼 또는 컬럼명에서 통화 감지
+            currency_col = self.find_column(df.columns.tolist(), self.CURRENCY_COLUMN_CANDIDATES)
+            detected_currency = None
+
+            # 1. 통화 컬럼이 있으면 사용
+            # 2. 없으면 금액/단가 컬럼명에서 감지
+            if not currency_col:
+                if amount_col:
+                    detected_currency = self.detect_currency_from_column(amount_col)
+                if not detected_currency and price_col:
+                    detected_currency = self.detect_currency_from_column(price_col)
+
             messages.append(f"SKU column: {sku_col}")
             messages.append(f"QTY column: {qty_col}")
             if price_col:
                 messages.append(f"Price column: {price_col}")
             if amount_col:
                 messages.append(f"Amount column: {amount_col}")
+            if currency_col:
+                messages.append(f"Currency column: {currency_col}")
+            elif detected_currency:
+                messages.append(f"Detected currency: {detected_currency}")
 
             # 5. 데이터 추출
             not_found_skus = []
@@ -231,6 +274,15 @@ class POParser:
                     except (ValueError, TypeError):
                         amount = 0.0
 
+                # 통화 파싱 (컬럼에서 또는 감지된 통화 사용)
+                currency = None
+                if currency_col:
+                    currency_value = str(row.get(currency_col, '')).strip().upper()
+                    if currency_value and currency_value != 'NAN':
+                        currency = currency_value
+                if not currency:
+                    currency = detected_currency  # 컬럼명에서 감지된 통화
+
                 # SKU Master에서 조회
                 sku_info = self.sku_master.get_by_sku_id(sku_id)
 
@@ -242,6 +294,7 @@ class POParser:
                         'qty': qty,
                         'unit_price': unit_price,
                         'amount': amount,
+                        'currency': currency,
                         'hs_code': sku_info.get('hs_code', ''),
                         'source': 'master',  # SKU Master에서 매칭됨
                         'manufacturer': sku_info.get('manufacturer', ''),
@@ -257,6 +310,7 @@ class POParser:
                         'qty': qty,
                         'unit_price': unit_price,
                         'amount': amount,
+                        'currency': currency,
                         'hs_code': '',
                         'source': 'po_only',  # PO에서만 가져옴
                         'manufacturer': '',
