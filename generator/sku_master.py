@@ -40,28 +40,26 @@ class SKUMaster:
 
         Returns:
             성공 여부
+
+        Raises:
+            Exception: 연결 실패 시 상세 에러 메시지와 함께 예외 발생
         """
-        try:
-            import streamlit as st
-            from streamlit_gsheets import GSheetsConnection
+        import streamlit as st
+        from streamlit_gsheets import GSheetsConnection
 
-            # Streamlit secrets에서 연결
-            conn = st.connection("gsheets", type=GSheetsConnection)
+        # Streamlit secrets에서 연결
+        conn = st.connection("gsheets", type=GSheetsConnection)
 
-            # 시트 읽기 (캐시 TTL 1시간)
-            self._df = conn.read(
-                spreadsheet=GSHEET_URL,
-                worksheet=GSHEET_WORKSHEET,
-                ttl=3600  # 1시간 캐시
-            )
+        # 시트 읽기 (캐시 TTL 1시간)
+        self._df = conn.read(
+            spreadsheet=GSHEET_URL,
+            worksheet=GSHEET_WORKSHEET,
+            ttl=3600  # 1시간 캐시
+        )
 
-            self._process_barcode()
-            self._source = "gsheet"
-            return True
-
-        except Exception as e:
-            print(f"Google Sheets 로드 실패: {e}")
-            return False
+        self._process_barcode()
+        self._source = "gsheet"
+        return True
 
     def get_source(self) -> str:
         """데이터 소스 반환"""
