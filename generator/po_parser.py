@@ -48,6 +48,28 @@ class POParser:
         'UPC'
     ]
 
+    # 단가 컬럼 후보 (FOB, VAT 제외 가격)
+    PRICE_COLUMN_CANDIDATES = [
+        'Supply Price',
+        'SUPPLY PRICE',
+        'FOB',
+        'UNIT PRICE',
+        'PRICE',
+        '단가',
+        '공급가',
+        'FOB PRICE'
+    ]
+
+    # 금액 컬럼 후보
+    AMOUNT_COLUMN_CANDIDATES = [
+        'AMOUNT',
+        'TOTAL AMOUNT',
+        'AMOUNT(KRW)',
+        'AMOUNT (KRW)',
+        '금액',
+        'TOTAL'
+    ]
+
     def __init__(self):
         self.sku_master = get_sku_master()
 
@@ -149,6 +171,8 @@ class POParser:
             qty_col = self.find_column(df.columns.tolist(), self.QTY_COLUMN_CANDIDATES)
             name_col = self.find_column(df.columns.tolist(), self.NAME_COLUMN_CANDIDATES)
             barcode_col = self.find_column(df.columns.tolist(), self.BARCODE_COLUMN_CANDIDATES)
+            price_col = self.find_column(df.columns.tolist(), self.PRICE_COLUMN_CANDIDATES)
+            amount_col = self.find_column(df.columns.tolist(), self.AMOUNT_COLUMN_CANDIDATES)
 
             if not sku_col:
                 messages.append("⚠️ SKU ID 컬럼을 찾을 수 없습니다")
@@ -160,6 +184,10 @@ class POParser:
 
             messages.append(f"SKU column: {sku_col}")
             messages.append(f"QTY column: {qty_col}")
+            if price_col:
+                messages.append(f"Price column: {price_col}")
+            if amount_col:
+                messages.append(f"Amount column: {amount_col}")
 
             # 5. 데이터 추출
             not_found_skus = []
@@ -185,6 +213,24 @@ class POParser:
                 if po_barcode == 'nan':
                     po_barcode = ''
 
+                # 단가 파싱
+                unit_price = 0.0
+                if price_col:
+                    price_value = row.get(price_col, 0)
+                    try:
+                        unit_price = float(price_value) if pd.notna(price_value) else 0.0
+                    except (ValueError, TypeError):
+                        unit_price = 0.0
+
+                # 금액 파싱
+                amount = 0.0
+                if amount_col:
+                    amount_value = row.get(amount_col, 0)
+                    try:
+                        amount = float(amount_value) if pd.notna(amount_value) else 0.0
+                    except (ValueError, TypeError):
+                        amount = 0.0
+
                 # SKU Master에서 조회
                 sku_info = self.sku_master.get_by_sku_id(sku_id)
 
@@ -194,7 +240,8 @@ class POParser:
                         'barcode': sku_info.get('barcode', po_barcode),
                         'description': sku_info.get('description', po_name),
                         'qty': qty,
-                        'unit_price': 0.0,
+                        'unit_price': unit_price,
+                        'amount': amount,
                         'hs_code': sku_info.get('hs_code', ''),
                         'source': 'master',  # SKU Master에서 매칭됨
                         'manufacturer': sku_info.get('manufacturer', ''),
@@ -208,7 +255,8 @@ class POParser:
                         'barcode': po_barcode,
                         'description': po_name if po_name and po_name != 'nan' else f'[미등록] {sku_id}',
                         'qty': qty,
-                        'unit_price': 0.0,
+                        'unit_price': unit_price,
+                        'amount': amount,
                         'hs_code': '',
                         'source': 'po_only',  # PO에서만 가져옴
                         'manufacturer': '',
