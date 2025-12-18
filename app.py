@@ -923,9 +923,15 @@ def main():
                 preview_data = []
                 for item in items:
                     source_icon = "✅" if item['source'] == 'master' else "⚠️"
-                    # 단가 포맷팅
+                    # 단가 포맷팅 (USD는 소수점 2자리, 그 외는 정수)
                     unit_price = item.get('unit_price', 0)
-                    price_str = f"{unit_price:,.0f}" if unit_price else "-"
+                    if unit_price:
+                        if po_currency == 'USD' or (not po_currency and currency == 'USD'):
+                            price_str = f"{unit_price:,.2f}"
+                        else:
+                            price_str = f"{unit_price:,.0f}"
+                    else:
+                        price_str = "-"
 
                     row_data = {
                         '': source_icon,
