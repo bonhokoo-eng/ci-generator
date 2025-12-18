@@ -183,6 +183,9 @@ div[data-testid="column"] button {
     color: var(--text-tertiary) !important;
     background: transparent !important;
     border: 1px solid var(--border-light) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 [data-testid="column"] .stButton > button:hover {
@@ -191,13 +194,8 @@ div[data-testid="column"] button {
     border-color: var(--error-bg) !important;
 }
 
-/* Sidebar Header Alignment Fix */
-[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
-    align-items: flex-end !important; /* Ensure bottom alignment */
-}
-
+/* Sidebar Header Alignment Fix - Removed manual margin since we use vertical_alignment="bottom" now */
 [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] .stButton > button {
-    margin-bottom: 2px !important; /* Micro-adjustment for visual alignment with inputs */
     background: transparent !important;
     border: 1px solid transparent !important;
     color: var(--text-tertiary) !important;
@@ -375,7 +373,7 @@ def render_invoice_items(currency, staff_email, receiver_info, data_store, invoi
         total_amount = 0
 
         for idx, item in enumerate(st.session_state.invoice_items):
-            col_info, col_qty, col_price, col_total, col_del = st.columns([4, 1, 2, 2, 1])
+            col_info, col_qty, col_price, col_total, col_del = st.columns([4, 1, 2, 2, 1], vertical_alignment="bottom")
 
             with col_info:
                 desc_short = item.description[:30] + '...' if len(item.description) > 30 else item.description
@@ -594,7 +592,7 @@ def main():
         staff_names = ["(직접 입력)"] + [s['name'] for s in staff_list]
 
         # 담당자 선택 + 삭제 버튼
-        col_staff, col_staff_del = st.columns([5, 1])
+        col_staff, col_staff_del = st.columns([5, 1], vertical_alignment="bottom")
         with col_staff:
             selected_staff_name = st.selectbox("담당자 선택", staff_names, label_visibility="collapsed")
         with col_staff_del:
@@ -634,7 +632,7 @@ def main():
         ]
 
         # 고객사 선택 + 삭제 버튼
-        col_recv, col_recv_del = st.columns([5, 1])
+        col_recv, col_recv_del = st.columns([5, 1], vertical_alignment="bottom")
         with col_recv:
             selected_receiver = st.selectbox("고객사 선택", receiver_options, label_visibility="collapsed")
         with col_recv_del:
