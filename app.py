@@ -29,10 +29,25 @@ st.set_page_config(
 
 # Load custom CSS
 def load_css():
-    css_file = Path(__file__).parent / "assets" / "custom.css"
-    if css_file.exists():
-        with open(css_file, "r") as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    css_path = Path(__file__).parent / "assets" / "custom.css"
+    try:
+        if css_path.exists():
+            with open(css_path, "r", encoding='utf-8') as f:
+                st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+        else:
+            # Fallback/Debug: Try relative path
+            fallback_path = Path("assets/custom.css")
+            if fallback_path.exists():
+                with open(fallback_path, "r", encoding='utf-8') as f:
+                    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+            else:
+                st.error(f"CSS not found. Checked: {css_path} and {fallback_path}")
+                st.info(f"CWD: {Path.cwd()}")
+                st.info(f"Files in CWD: {[x.name for x in Path.cwd().glob('*')]}")
+                if (Path.cwd() / "assets").exists():
+                     st.info(f"Files in assets: {[x.name for x in (Path.cwd() / 'assets').glob('*')]}")
+    except Exception as e:
+        st.error(f"Error loading CSS: {e}")
 
 load_css()
 
